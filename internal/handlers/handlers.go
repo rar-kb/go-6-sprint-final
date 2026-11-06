@@ -11,14 +11,18 @@ import (
 	"github.com/Yandex-Practicum/go1fl-sprint6-final/internal/service"
 )
 
+const indexFile = "index.html"
+
+// Index отдаёт HTML-форму из файла index.html.
 func Index(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
 		return
 	}
-	http.ServeFile(w, r, "index.html")
+	http.ServeFile(w, r, indexFile)
 }
 
+// Upload принимает файл из формы, конвертирует его содержимое
 func Upload(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseMultipartForm(10 << 20); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -58,10 +62,13 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Write([]byte(result))
+	if _, err := w.Write([]byte(result)); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
-// safeName заменяет символы недопустимые в имени файла
+// safeName заменяет символы, недопустимые в имени файла
 func safeName(name string) string {
 	replacer := strings.NewReplacer(
 		":", "-",
