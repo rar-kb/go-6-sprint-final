@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/Yandex-Practicum/go1fl-sprint6-final/internal/service"
@@ -24,6 +23,11 @@ func Index(w http.ResponseWriter, r *http.Request) {
 
 // Upload принимает файл из формы, конвертирует его содержимое
 func Upload(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
 	if err := r.ParseMultipartForm(10 << 20); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -42,40 +46,36 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := service.Convert(string(data))
+	converted, err := service.Convert(string(data))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	filename := safeName(time.Now().UTC().String()) + filepath.Ext(header.Filename)
+	ext := filepath.Ext(header.Filename)
+	if ext == "" {
+		ext = ".txt"
+	}
 
-	out, err := os.Create(filename)
+	name := time.Now().UTC().Format("2006-01-02_15-04-05.000000000") + ext
+
+	out, err := os.Create(name)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	defer out.Close()
 
-	if _, err := out.WriteString(result); err != nil {
+	if _, err := out.WriteString(converted); err != nil {
+		out.Close()
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if _, err := w.Write([]byte(result)); err != nil {
+	if err := out.Close(); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-}
 
-// safeName заменяет символы, недопустимые в имени файла
-func safeName(name string) string {
-	replacer := strings.NewReplacer(
-		":", "-",
-		" ", "_",
-		".", "_",
-		"/", "-",
-		"\\", "-",
-	)
-	return replacer.Replace(name)
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	_, _ = w.Write([]byte(converted))
 }
